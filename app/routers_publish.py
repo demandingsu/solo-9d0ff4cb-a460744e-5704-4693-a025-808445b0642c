@@ -52,7 +52,7 @@ def publish(batch_id: int,
     except PublishError as exc:
         raise HTTPException(400, str(exc)) from exc
     return PublishResultOut(
-        batch_id=batch.id,
+        batch_id=batch_id,
         success=outcome.success,
         status=outcome.status.value,
         taxonomy_version_id=outcome.taxonomy_version_id,

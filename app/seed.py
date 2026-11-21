@@ -77,7 +77,6 @@ def seed_if_empty(db: Session) -> bool:
         return False
 
     v1 = create_taxonomy_version(db, V1_ROWS, note="演示分类表 v1（初始版本）")
-    db.flush()
 
     batch1 = SurveyBatch(name="示例批次A（正常发布）", investigator="张研究员")
     db.add(batch1)
@@ -85,8 +84,6 @@ def seed_if_empty(db: Session) -> bool:
     for plot, day, raw, qty in BATCH1_OBS:
         db.add(Observation(batch_id=batch1.id, plot_code=plot, observed_on=day,
                            raw_species_name=raw, quantity=qty))
-    db.flush()
-    publish_batch(db, batch1, v1.id)
 
     batch2 = SurveyBatch(name="示例批次B（含未知名/环路，待核）", investigator="李研究员")
     db.add(batch2)
@@ -94,12 +91,18 @@ def seed_if_empty(db: Session) -> bool:
     for plot, day, raw, qty in BATCH2_OBS:
         db.add(Observation(batch_id=batch2.id, plot_code=plot, observed_on=day,
                            raw_species_name=raw, quantity=qty))
-    db.flush()
-    publish_batch(db, batch2, v1.id)  # 预期整批待核
 
     batch3 = SurveyBatch(name="示例批次C（草稿，可自行上传发布）",
                          investigator="王研究员")
     db.add(batch3)
+
+    # 基础数据先提交：发布会把“读快照”和“写结果”拆成独立事务，
+    # 读阶段结束时会回滚未提交的工作，因此这里必须先落库。
+    db.commit()
+    v1_id = v1.id
+
+    publish_batch(db, batch1, v1_id)
+    publish_batch(db, batch2, v1_id)  # 预期整批待核
 
     # 发布 v2：批次A 中“树麻雀/麻雀”的接受名变化 → 自动 STALE，旧结果保留
     v2 = create_taxonomy_version(
